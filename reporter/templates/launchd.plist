@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ai.usage-reporter.agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <!-- REPORTER_CMD -->
+    </array>
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TZ</key>
+        <string>Asia/Shanghai</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>STATE_LOG_PATH</string>
+    <key>StandardErrorPath</key>
+    <string>STATE_LOG_PATH</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

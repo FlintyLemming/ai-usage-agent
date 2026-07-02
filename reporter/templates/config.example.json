@@ -1,0 +1,9 @@
+{
+  "source_id": "<hostname>",
+  "source_label": null,
+  "insight_url": "http://127.0.0.1:8765",
+  "tokscale_bin": "tokscale",
+  "tokscale_args": ["graph"],
+  "lookback_days": 90,
+  "request_timeout_seconds": 30
+}

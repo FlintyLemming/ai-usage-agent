@@ -1,0 +1,10 @@
+[Unit]
+Description=Run ai-usage-reporter every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+Unit=ai-usage-reporter.service
+
+[Install]
+WantedBy=timers.target
