@@ -23,8 +23,7 @@ def test_run_success(tmp_path, monkeypatch):
         {"date": "2026-07-02", "clients": [
             {"client": "zcode", "modelId": "glm-5.2",
              "tokens": {"input": 10, "output": 5}}]}]})
-    monkeypatch.setattr("reporter.__main__.upload", lambda c, pts, sd, **k: (k, len(pts))[1])
-    monkeypatch.setattr("time.time", lambda: 100.0)
+    monkeypatch.setattr("reporter.__main__.upload", lambda c, pts, ra, sd, **k: len(pts))
 
     code = cli(["run", "--config", str(cfg)])
     assert code == 0
@@ -38,8 +37,7 @@ def test_run_empty_contributions_is_success(tmp_path, monkeypatch):
     cfg = write_cfg(tmp_path)
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr("reporter.__main__.collect", lambda c: {"contributions": []})
-    monkeypatch.setattr("reporter.__main__.upload", lambda c, pts, sd, **k: len(pts))
-    monkeypatch.setattr("time.time", lambda: 1.0)
+    monkeypatch.setattr("reporter.__main__.upload", lambda c, pts, ra, sd, **k: len(pts))
     assert cli(["run", "--config", str(cfg)]) == 0
 
 
@@ -49,7 +47,6 @@ def test_run_collector_error_exits_and_records(tmp_path, monkeypatch):
     from reporter.collector import CollectorError
     monkeypatch.setattr("reporter.__main__.collect",
                        lambda c: (_ for _ in ()).throw(CollectorError("bin gone", 3)))
-    monkeypatch.setattr("time.time", lambda: 1.0)
     code = cli(["run", "--config", str(cfg)])
     assert code == 3
     state = json.loads((tmp_path / "state" / "ai-usage-reporter" / "state.json").read_text())
@@ -64,8 +61,7 @@ def test_run_uploader_error_exits_and_records(tmp_path, monkeypatch):
     monkeypatch.setattr("reporter.__main__.collect", lambda c: {"contributions": []})
     from reporter.uploader import UploaderError
     monkeypatch.setattr("reporter.__main__.upload",
-                       lambda c, pts, sd, **k: (_ for _ in ()).throw(UploaderError("nope", 6)))
-    monkeypatch.setattr("time.time", lambda: 1.0)
+                       lambda c, pts, ra, sd, **k: (_ for _ in ()).throw(UploaderError("nope", 6)))
     assert cli(["run", "--config", str(cfg)]) == 6
     state = json.loads((tmp_path / "state" / "ai-usage-reporter" / "state.json").read_text())
     assert state["consecutive_failures"] == 1
@@ -81,7 +77,6 @@ def test_run_consecutive_failures_increments(tmp_path, monkeypatch):
     from reporter.collector import CollectorError
     monkeypatch.setattr("reporter.__main__.collect",
                        lambda c: (_ for _ in ()).throw(CollectorError("x", 4)))
-    monkeypatch.setattr("time.time", lambda: 1.0)
     cli(["run", "--config", str(cfg)])
     state = json.loads((tmp_path / "state" / "ai-usage-reporter" / "state.json").read_text())
     assert state["consecutive_failures"] == 3
@@ -93,8 +88,7 @@ def test_run_resets_consecutive_failures_on_success(tmp_path, monkeypatch):
     import reporter.state as st
     st.write_state(tmp_path / "state" / "ai-usage-reporter", consecutive_failures=3)
     monkeypatch.setattr("reporter.__main__.collect", lambda c: {"contributions": []})
-    monkeypatch.setattr("reporter.__main__.upload", lambda c, pts, sd, **k: len(pts))
-    monkeypatch.setattr("time.time", lambda: 1.0)
+    monkeypatch.setattr("reporter.__main__.upload", lambda c, pts, ra, sd, **k: len(pts))
     cli(["run", "--config", str(cfg)])
     state = json.loads((tmp_path / "state" / "ai-usage-reporter" / "state.json").read_text())
     assert state["consecutive_failures"] == 0

@@ -18,6 +18,8 @@ def map_points(tokscale_json: dict) -> list[dict]:
         date = day.get("date")
         for src in day.get("clients") or []:
             model_id = src.get("modelId")
+            if not date or not model_id:
+                continue  # insight rejects the whole payload on a null key
             tokens = src.get("tokens") or {}
             input_tokens = int(tokens.get("input", 0) or 0)
             output_tokens = int(tokens.get("output", 0) or 0)

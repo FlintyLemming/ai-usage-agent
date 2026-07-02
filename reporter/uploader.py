@@ -1,4 +1,4 @@
-"""POST points to insight + replay pending files. Exit codes 6/7."""
+"""POST snapshots to insight + replay the pending one. Exit codes 6/7."""
 from __future__ import annotations
 
 import json
@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from .config import Config
-from .state import delete_pending, list_pending, save_pending
+from .state import delete_pending, load_pending, save_pending
 
 log = logging.getLogger("reporter.uploader")
 
@@ -34,13 +34,21 @@ def _default_poster(url: str, body: bytes, headers: dict[str, str], timeout: int
         raise  # re-raised; caller maps to exit 6
 
 
-def post_payload(config: Config, points: list[dict], *, poster: Callable) -> None:
-    """POST one payload. Raises UploaderError(6/7)."""
-    body = json.dumps({
+def build_payload(config: Config, points: list[dict], reported_at: str) -> dict:
+    """reported_at is this run's UTC+8 date; insight freezes all days before
+    it once the payload lands, so it must travel with the payload (a replayed
+    pending file keeps its own, older date)."""
+    return {
         "source_id": config.source_id,
         "source_label": config.source_label,
+        "reported_at": reported_at,
         "points": points,
-    }).encode()
+    }
+
+
+def post_payload(config: Config, payload: dict, *, poster: Callable) -> None:
+    """POST one payload. Raises UploaderError(6/7)."""
+    body = json.dumps(payload).encode()
     headers = {"Content-Type": "application/json"}
     if config.auth_token:
         headers["X-Report-Key"] = config.auth_token
@@ -52,49 +60,26 @@ def post_payload(config: Config, points: list[dict], *, poster: Callable) -> Non
         raise UploaderError(f"insight returned HTTP {status}", 7)
 
 
-def upload(config: Config, points: list[dict], state_dir: Path,
-           *, poster: Callable | None = None, now_ts: float | None = None) -> int:
-    """Drain pending (oldest first), then POST the fresh payload.
+def upload(config: Config, points: list[dict], reported_at: str, state_dir: Path,
+           *, poster: Callable | None = None) -> int:
+    """Replay the pending snapshot (if any), then POST the fresh one.
 
-    On any failure (pending replay or fresh post) the already-replayed pending
-    files are gone and the surviving ones stay in place; the fresh payload is
-    also saved to pending so the next successful run retries it. Re-raises the
-    UploaderError. Returns the number of points in the fresh payload on success.
+    The pending payload may still hold days the local data has since lost, so
+    it goes first; the fresh payload then overwrites everything it covers. On
+    any failure the fresh payload becomes the new pending (a full-window
+    snapshot supersedes any older one) and the UploaderError is re-raised.
+    Returns the number of points in the fresh payload on success.
     """
     post = poster or _default_poster
-    err: UploaderError | None = None
-
-    # 1. drain pending (oldest first); leave failed files in place
-    for p in list_pending(state_dir):
-        try:
-            payload = json.loads(p.read_text())
-        except json.JSONDecodeError:
-            log.warning("skipping corrupt pending file %s", p)
-            delete_pending(p)
-            continue
-        try:
-            post_payload(config, payload["points"], poster=post)
-        except UploaderError as e:
-            log.warning("pending replay failed for %s: %s", p, e)
-            err = e
-            break
-        delete_pending(p)
-        log.info("replayed pending %s", p)
-
-    # 2. fresh post
-    if err is None:
-        try:
-            post_payload(config, points, poster=post)
-        except UploaderError as e:
-            err = e
-
-    if err is not None:
-        # persist this cycle's payload so the next successful run retries it
-        if now_ts is not None:
-            save_pending(state_dir, {
-                "source_id": config.source_id,
-                "source_label": config.source_label,
-                "points": points,
-            }, ts=now_ts)
-        raise err
+    fresh = build_payload(config, points, reported_at)
+    pending = load_pending(state_dir)
+    try:
+        if pending is not None:
+            post_payload(config, pending, poster=post)
+            log.info("replayed pending snapshot")
+        post_payload(config, fresh, poster=post)
+    except UploaderError as e:
+        save_pending(state_dir, fresh)
+        raise e
+    delete_pending(state_dir)
     return len(points)

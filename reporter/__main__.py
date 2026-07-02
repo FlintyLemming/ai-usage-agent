@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -54,8 +53,9 @@ def cmd_run(args) -> int:
 
     points = map_points(raw)
 
+    reported_at = datetime.now(UTC8).strftime("%Y-%m-%d")
     try:
-        sent = upload(cfg, points, state_dir, now_ts=time.time())
+        sent = upload(cfg, points, reported_at, state_dir)
     except UploaderError as e:
         write_state(state_dir, last_run_at=_now_iso(), last_result="error",
                     last_error=str(e), consecutive_failures=consecutive + 1,
