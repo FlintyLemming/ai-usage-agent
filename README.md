@@ -14,9 +14,10 @@ launchd，Linux 用 systemd 用户单元。
    client 的记录按 input/output 求和合并。
 3. 将 `{"source_id","source_label","reported_at","points"}` POST 到
    `{insight_url}/api/usage/report`（配置了 `auth_token` 时附带 `X-Report-Key`）。
-   ai-plan-insight 按 `(date, source_id, model_id)` UPSERT，重复运行不会重复计数；
-   一旦服务端收到日期晚于 D 的上报，D 日即封板，之后本地历史数据被清理或重写
-   也不会再影响面板。
+   ai-plan-insight 对 payload 覆盖到的每个未封板日期做整天替换（先删后插），
+   重复运行不会重复计数；一旦服务端收到 `reported_at` 晚于 D 的上报，该
+   source 的 D 日即封板，之后本地历史数据被清理或重写也不会再影响面板
+   （封板按 source 隔离，不影响其他设备上报同一天）。
 4. POST 失败（insight 不可达 / 非 2xx）时，把本次 payload 存到
    `~/.local/state/ai-usage-reporter/pending.json`（单文件——每次 payload 都是
    全窗口快照，只保留最新一份失败的即可），下次运行时先重放它再发送新快照。
