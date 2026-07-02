@@ -1,0 +1,117 @@
+import json
+import subprocess
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+
+import pytest
+
+from reporter.collector import CollectorError, collect, since_date
+from reporter.config import Config
+
+
+UTC8 = timezone(timedelta(hours=8))
+
+
+def make_cfg(**over) -> Config:
+    base = dict(
+        source_id="m", insight_url="http://localhost:8765",
+        tokscale_bin="tokscale", tokscale_args=["graph"], lookback_days=90,
+    )
+    base.update(over)
+    return Config(**base)
+
+
+def fake_runner(stdout: bytes = b'{"contributions":[]}', returncode: int = 0, stderr: bytes = b""):
+    calls = []
+
+    def run(argv, env):
+        calls.append((argv, env))
+        return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
+
+    return run, calls
+
+
+def _put_tokscale_on_path(tmp_path, monkeypatch):
+    """Stub shutil.which so binary resolution succeeds without a real tokscale.
+
+    Tests that inject a `runner` are exercising the runner/argv/env/exit-code
+    paths; binary resolution is a precondition, not the unit under test.
+    """
+    fake = tmp_path / "tokscale"
+    fake.write_text("#!/bin/sh\nexit 0\n")
+    fake.chmod(0o755)
+    monkeypatch.setattr("shutil.which", lambda name: str(fake) if name == "tokscale" else None)
+    return fake
+
+
+def test_collect_invokes_tokscale_with_since(tmp_path, monkeypatch, tokscale_sample):
+    _put_tokscale_on_path(tmp_path, monkeypatch)
+    run, calls = fake_runner(json.dumps(tokscale_sample).encode())
+    cfg = make_cfg()
+    data = collect(cfg, runner=run)
+    argv = calls[0][0]
+    assert argv[0].endswith("tokscale") or argv[0] == "tokscale"
+    assert "--since" in argv
+    assert "graph" in argv
+
+
+def test_collect_sets_tz_shanghai_in_env(tmp_path, monkeypatch):
+    _put_tokscale_on_path(tmp_path, monkeypatch)
+    run, calls = fake_runner(b'{"contributions":[]}')
+    collect(make_cfg(), runner=run)
+    env = calls[0][1]
+    assert env.get("TZ") == "Asia/Shanghai"
+
+
+def test_collect_parses_json(tmp_path, monkeypatch, tokscale_sample):
+    _put_tokscale_on_path(tmp_path, monkeypatch)
+    run, _ = fake_runner(json.dumps(tokscale_sample).encode())
+    data = collect(make_cfg(), runner=run)
+    assert "contributions" in data
+    assert len(data["contributions"]) == 2
+
+
+def test_binary_missing_exits_3(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    with pytest.raises(CollectorError) as exc:
+        collect(make_cfg(tokscale_bin="nope-tokscale"))
+    assert exc.value.exit_code == 3
+
+
+def test_binary_not_executable_exits_3(tmp_path, monkeypatch):
+    fake = tmp_path / "tokscale"
+    fake.write_text("#!/bin/sh\nexit 0\n")
+    fake.chmod(0o644)  # not executable
+    monkeypatch.setattr("shutil.which", lambda name: str(fake) if name == "tokscale" else None)
+    with pytest.raises(CollectorError) as exc:
+        collect(make_cfg(tokscale_bin=str(fake)))
+    assert exc.value.exit_code == 3
+
+
+def test_tokscale_nonzero_exits_4(tmp_path, monkeypatch):
+    _put_tokscale_on_path(tmp_path, monkeypatch)
+    run, _ = fake_runner(b"oops", returncode=1, stderr=b"error: boom")
+    with pytest.raises(CollectorError) as exc:
+        collect(make_cfg(), runner=run)
+    assert exc.value.exit_code == 4
+    assert "boom" in str(exc.value)
+
+
+def test_bad_json_exits_5(tmp_path, monkeypatch):
+    _put_tokscale_on_path(tmp_path, monkeypatch)
+    run, _ = fake_runner(b"not json at all")
+    with pytest.raises(CollectorError) as exc:
+        collect(make_cfg(), runner=run)
+    assert exc.value.exit_code == 5
+
+
+def test_since_date_default():
+    # 2026-07-02 minus 90 days = 2026-04-03
+    now = datetime(2026, 7, 2, 15, 0, tzinfo=UTC8)
+    assert since_date(90, now_utc8=now) == "2026-04-03"
+
+
+def test_since_date_zero_lookback():
+    now = datetime(2026, 7, 2, 0, 30, tzinfo=UTC8)
+    # midnight UTC+8 boundary -> 2026-07-02
+    assert since_date(0, now_utc8=now) == "2026-07-02"
