@@ -120,6 +120,22 @@ def test_config_error_exits_2(tmp_path, monkeypatch):
     assert cli(["run", "--config", str(p)]) == 2
 
 
+def test_run_falls_back_to_default_config_path(tmp_path, monkeypatch):
+    """run without --config should use default_config_path(), not crash on None."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    # default config does not exist -> ConfigError -> exit 2
+    assert cli(["run"]) == 2
+
+
+def test_status_falls_back_to_default_config_path(tmp_path, monkeypatch, capsys):
+    """status without --config should not crash; prints defaults, exit 0."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    assert cli(["status"]) == 0
+    assert "last_result" in capsys.readouterr().out
+
+
 def test_install_invokes_installer(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))

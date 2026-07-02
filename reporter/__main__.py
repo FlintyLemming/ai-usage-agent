@@ -31,13 +31,14 @@ def _now_iso() -> str:
 
 
 def cmd_run(args) -> int:
+    config_path = args.config or default_config_path()
     try:
-        cfg = load_config(args.config)
+        cfg = load_config(config_path)
     except ConfigError as e:
         print(f"config error: {e}", file=sys.stderr)
         return e.exit_code
 
-    state_dir = _state_dir_for(args.config)
+    state_dir = _state_dir_for(config_path)
     state_dir.mkdir(parents=True, exist_ok=True)
     prior = read_state(state_dir)
     consecutive = prior.get("consecutive_failures", 0)
@@ -102,7 +103,7 @@ def cmd_uninstall(args) -> int:
 
 
 def cmd_status(args) -> int:
-    state_dir = _state_dir_for(args.config)
+    state_dir = _state_dir_for(args.config or default_config_path())
     s = read_state(state_dir)
     print(f"last_run_at:          {s.get('last_run_at')}")
     print(f"last_result:          {s.get('last_result')}")
