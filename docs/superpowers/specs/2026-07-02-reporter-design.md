@@ -78,28 +78,40 @@ for day in tokscale["contributions"]:
     date = day["date"]                       # "YYYY-MM-DD", UTC+8 (agent runs under TZ=Asia/Shanghai)
     for src in day["clients"]:
         model_id = src["modelId"]            # RAW, e.g. "glm-5.2" — aliasing is insight's job
-        tokens = src["tokens"]
+        tokens = src["tokens"]               # camelCase: cacheRead, cacheWrite, reasoning
         points.append({
             "date": date,
             "model_id": model_id,
-            "input_tokens":  tokens.get("input", 0),
-            "output_tokens": tokens.get("output", 0),
+            "input_tokens":       tokens.get("input", 0),
+            "output_tokens":      tokens.get("output", 0),
+            "cache_read_tokens":  tokens.get("cacheRead", 0),
+            "cache_write_tokens": tokens.get("cacheWrite", 0),
+            "reasoning_tokens":   tokens.get("reasoning", 0),
         })
 ```
 
-**Deliberately dropped:** `cacheRead`, `cacheWrite`, `reasoning`, `cost`, `messages`, `client`, `providerId`, `activeTimeMs`. insight only charts input+output (YAGNI). If insight later gains a cost view, the reporter can be extended to forward `cost` — the payload schema is additive.
+All five token categories are forwarded so insight's per-model total matches
+tokscale's `totalTokens` (= input + output + cache_read + cache_write +
+reasoning; the categories are mutually exclusive and additive, verified in
+`tokscale-core/src/aggregator.rs`). Dropping them earlier made the dashboard
+under-report by the cache tokens, which dominate real usage.
+
+**Dropped:** `cost`, `messages`, `client`, `providerId`, `activeTimeMs`. insight
+only charts the token breakdown (YAGNI). If insight later gains a cost view, the
+reporter can be extended to forward `cost` — the payload schema is additive.
 
 **Aliasing is NOT applied here.** Raw `modelId` is sent as-is; insight applies `model_aliases` at read time. This keeps all alias config in one place (insight's `config.json`) and means renaming an alias re-aggregates history without re-running the reporter.
 
-**Dedup across clients within a day:** if two distinct `client` values report the same `modelId` on the same date (e.g. zcode + opencode both used `glm-5.2`), the mapper produces two points with identical `(date, model_id)`. The uploader MUST merge these before POST (sum input/output), because insight's UPSERT key is `(date, source_id, model_id)` and would otherwise let the second point overwrite the first. The mapper does a final pass:
+**Dedup across clients within a day:** if two distinct `client` values report the same `modelId` on the same date (e.g. zcode + opencode both used `glm-5.2`), the mapper produces two points with identical `(date, model_id)`. The uploader MUST merge these before POST (sum every token field), because insight's UPSERT key is `(date, source_id, model_id)` and would otherwise let the second point overwrite the first. The mapper does a final pass:
 
 ```python
 merged = {}
 for p in points:
     key = (p["date"], p["model_id"])
     if key in merged:
-        merged[key]["input_tokens"]  += p["input_tokens"]
-        merged[key]["output_tokens"] += p["output_tokens"]
+        for k in ("input_tokens", "output_tokens",
+                  "cache_read_tokens", "cache_write_tokens", "reasoning_tokens"):
+            merged[key][k] += p[k]
     else:
         merged[key] = dict(p)
 points = list(merged.values())
@@ -257,7 +269,7 @@ ai-usage-reporter/
 
 ## 11. Testing Strategy
 
-- **`test_mapper.py`** — the core logic. Fixtured with a captured `tokscale graph` sample (stored in `tests/fixtures/`). Asserts: correct flatten, cache/reasoning/cost dropped, duplicate `(date, model_id)` across clients merged by sum, empty contributions → empty points.
+- **`test_mapper.py`** — the core logic. Fixtured with a captured `tokscale graph` sample (stored in `tests/fixtures/`). Asserts: correct flatten of all five token categories, cost/messages/client dropped, duplicate `(date, model_id)` across clients merged by sum, empty contributions → empty points.
 - **`test_uploader.py`** — POST payload shape matches insight's `UsageReportRequest`; pending save on connection error; pending replay drains in order and deletes on success; replay is idempotent (replaying the same file twice produces the same insight state).
 - **`test_collector.py`** — `subprocess.run` stubbed to return fixture JSON; asserts tokscale is invoked with configured args and `TZ` env is set in the subprocess environment.
 - **`test_config.py`** — missing `source_id` → exit 2; missing `insight_url` → exit 2; unknown extra keys ignored (forward-compat).
@@ -271,7 +283,6 @@ No live network or live tokscale in CI — all external interactions stubbed.
 
 - Windows support (macOS + Linux only, per requirement).
 - Cost/pricing forwarding (insight doesn't display it yet).
-- Cache/reasoning token forwarding.
 - A long-running daemon or local HTTP server (timer + one-shot CLI only).
 - Auto-updating the tokscale binary.
 - Multiple insight targets (one reporter → one insight instance).

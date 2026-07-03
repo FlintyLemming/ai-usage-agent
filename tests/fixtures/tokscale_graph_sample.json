@@ -7,8 +7,8 @@
       "totals": {"tokens": 2090000, "cost": 6.17, "messages": 120},
       "tokenBreakdown": {"input": 1500000, "output": 590000, "cacheRead": 100000, "cacheWrite": 0, "reasoning": 0},
       "clients": [
-        {"client": "zcode", "modelId": "glm-5.2", "providerId": "zhipu", "tokens": {"input": 1200000, "output": 450000, "cacheRead": 80000, "cacheWrite": 0, "reasoning": 0}, "cost": 3.50, "messages": 70},
-        {"client": "opencode", "modelId": "glm-5.2", "providerId": "zhipu", "tokens": {"input": 300000, "output": 140000, "cacheRead": 20000, "cacheWrite": 0, "reasoning": 0}, "cost": 1.67, "messages": 50},
+        {"client": "zcode", "modelId": "glm-5.2", "providerId": "zhipu", "tokens": {"input": 1200000, "output": 450000, "cacheRead": 80000, "cacheWrite": 0, "reasoning": 1000}, "cost": 3.50, "messages": 70},
+        {"client": "opencode", "modelId": "glm-5.2", "providerId": "zhipu", "tokens": {"input": 300000, "output": 140000, "cacheRead": 20000, "cacheWrite": 0, "reasoning": 500}, "cost": 1.67, "messages": 50},
         {"client": "zcode", "modelId": "claude-sonnet-4-5", "providerId": "anthropic", "tokens": {"input": 80000, "output": 30000, "cacheRead": 0, "cacheWrite": 0, "reasoning": 0}, "cost": 2.00, "messages": 20}
       ],
       "activeTimeMs": 5400000
@@ -18,7 +18,7 @@
       "totals": {"tokens": 2070000, "cost": 6.17, "messages": 110},
       "tokenBreakdown": {"input": 1490000, "output": 580000, "cacheRead": 0, "cacheWrite": 0, "reasoning": 0},
       "clients": [
-        {"client": "zcode", "modelId": "glm-5.2", "providerId": "zhipu", "tokens": {"input": 980000, "output": 410000, "cacheRead": 0, "cacheWrite": 0, "reasoning": 0}, "cost": 6.17, "messages": 110}
+        {"client": "zcode", "modelId": "glm-5.2", "providerId": "zhipu", "tokens": {"input": 980000, "output": 410000, "cacheRead": 0, "cacheWrite": 0, "reasoning": 250}, "cost": 6.17, "messages": 110}
       ],
       "activeTimeMs": 5200000
     }

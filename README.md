@@ -10,8 +10,10 @@ launchd，Linux 用 systemd 用户单元。
 
 1. 以 `TZ=Asia/Shanghai` 调用 `tokscale graph --since <今天(UTC+8) - lookback_days>`，
    让 tokscale 按 UTC+8 的自然日分桶。
-2. 把 `contributions[].clients[]` 摊平成 insight 的 `points[]`，同一天同模型跨
-   client 的记录按 input/output 求和合并。
+2. 把 `contributions[].clients[]` 摊平成 insight 的 `points[]`，转发全部五类
+   token（input、output、cache_read、cache_write、reasoning），同一天同模型跨
+   client 的记录按每类 token 求和合并。这样面板的总 token 与 tokscale 的
+   `totalTokens` 完全一致（五类互斥相加）。
 3. 将 `{"source_id","source_label","reported_at","points"}` POST 到
    `{insight_url}/api/usage/report`（配置了 `auth_token` 时附带 `X-Report-Key`）。
    ai-plan-insight 对 payload 覆盖到的每个未封板日期做整天替换（先删后插），
