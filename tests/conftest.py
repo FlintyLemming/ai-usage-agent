@@ -20,8 +20,8 @@ def sample_config_dict() -> dict:
         "source_id": "macbook-flinty",
         "source_label": "MacBook Pro",
         "insight_url": "http://127.0.0.1:8765",
-        "tokscale_bin": "tokscale",
-        "tokscale_args": ["graph"],
+        "tokscale_bin": "npx",
+        "tokscale_args": ["tokscale@latest", "graph"],
         "lookback_days": 90,
         "request_timeout_seconds": 30,
     }

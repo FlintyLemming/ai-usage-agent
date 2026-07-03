@@ -24,8 +24,8 @@ def test_load_valid_config(tmp_path, sample_config_dict):
     assert cfg.source_id == "macbook-flinty"
     assert cfg.source_label == "MacBook Pro"
     assert cfg.insight_url == "http://127.0.0.1:8765"
-    assert cfg.tokscale_bin == "tokscale"
-    assert cfg.tokscale_args == ["graph"]
+    assert cfg.tokscale_bin == "npx"
+    assert cfg.tokscale_args == ["tokscale@latest", "graph"]
     assert cfg.lookback_days == 90
     assert cfg.request_timeout_seconds == 30
     assert cfg.auth_token is None
@@ -64,8 +64,8 @@ def test_defaults_applied(tmp_path, sample_config_dict):
     minimal = {"source_id": "x", "insight_url": "http://localhost:8765"}
     cfg = load_config(write_cfg(tmp_path, minimal))
     assert cfg.source_label is None
-    assert cfg.tokscale_bin == "tokscale"
-    assert cfg.tokscale_args == ["graph"]
+    assert cfg.tokscale_bin == "npx"
+    assert cfg.tokscale_args == ["tokscale@latest", "graph"]
     assert cfg.lookback_days == 90
     assert cfg.request_timeout_seconds == 30
 

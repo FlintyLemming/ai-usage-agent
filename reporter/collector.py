@@ -39,16 +39,16 @@ def _resolve_binary(name_or_path: str) -> str:
         if p.is_file() and os.access(p, os.X_OK):
             return str(p)
         raise CollectorError(
-            f"tokscale binary not executable: {name_or_path} "
-            f"(install: `npm i -g @tokscale/cli` or build from the tokscale repo)",
+            f"tokscale launcher not executable: {name_or_path} "
+            f"(default launcher is `npx`, shipped with Node.js — see https://nodejs.org/)",
             3,
         )
     resolved = shutil.which(name_or_path)
     if resolved:
         return resolved
     raise CollectorError(
-        f"tokscale binary '{name_or_path}' not found on PATH "
-        f"(install: `npm i -g @tokscale/cli` or build from the tokscale repo)",
+        f"tokscale launcher '{name_or_path}' not found on PATH "
+        f"(default launcher is `npx`, shipped with Node.js — see https://nodejs.org/)",
         3,
     )
 

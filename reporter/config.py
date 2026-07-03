@@ -20,8 +20,8 @@ class Config:
     source_id: str
     insight_url: str
     source_label: str | None = None
-    tokscale_bin: str = "tokscale"
-    tokscale_args: list[str] = field(default_factory=lambda: ["graph"])
+    tokscale_bin: str = "npx"
+    tokscale_args: list[str] = field(default_factory=lambda: ["tokscale@latest", "graph"])
     lookback_days: int = 90
     request_timeout_seconds: int = 30
     auth_token: str | None = None
@@ -71,7 +71,7 @@ def load_config(path: Path) -> Config:
     if not isinstance(timeout, int) or timeout < 1:
         raise ConfigError("config: 'request_timeout_seconds' must be a positive integer", 2)
 
-    args = data.get("tokscale_args", ["graph"])
+    args = data.get("tokscale_args", ["tokscale@latest", "graph"])
     if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
         raise ConfigError("config: 'tokscale_args' must be a list of strings", 2)
 
@@ -79,7 +79,7 @@ def load_config(path: Path) -> Config:
         source_id=str(data["source_id"]),
         insight_url=str(data["insight_url"]),
         source_label=data.get("source_label"),
-        tokscale_bin=str(data.get("tokscale_bin", "tokscale")),
+        tokscale_bin=str(data.get("tokscale_bin", "npx")),
         tokscale_args=list(args),
         lookback_days=lookback,
         request_timeout_seconds=timeout,
@@ -93,8 +93,8 @@ def write_template_config(path: Path, hostname: str) -> Path:
         "source_id": f"<{hostname}>",
         "source_label": None,
         "insight_url": "http://127.0.0.1:8765",
-        "tokscale_bin": "tokscale",
-        "tokscale_args": ["graph"],
+        "tokscale_bin": "npx",
+        "tokscale_args": ["tokscale@latest", "graph"],
         "lookback_days": 90,
         "request_timeout_seconds": 30,
     }

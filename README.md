@@ -8,8 +8,8 @@ launchd，Linux 用 systemd 用户单元。
 
 每个 `run` 周期：
 
-1. 以 `TZ=Asia/Shanghai` 调用 `tokscale graph --since <今天(UTC+8) - lookback_days>`，
-   让 tokscale 按 UTC+8 的自然日分桶。
+1. 以 `TZ=Asia/Shanghai` 调用 `npx tokscale@latest graph --since <今天(UTC+8) - lookback_days>`，
+   让 tokscale 按 UTC+8 的自然日分桶（npx 按需拉取/缓存 tokscale，无需预装）。
 2. 把 `contributions[].clients[]` 摊平成 insight 的 `points[]`，转发全部五类
    token（input、output、cache_read、cache_write、reasoning），同一天同模型跨
    client 的记录按每类 token 求和合并。这样面板的总 token 与 tokscale 的
@@ -25,6 +25,9 @@ launchd，Linux 用 systemd 用户单元。
    全窗口快照，只保留最新一份失败的即可），下次运行时先重放它再发送新快照。
 
 ## 安装
+
+前置：机器上需有 Node.js（自带 `npx`）；reporter 通过 `npx tokscale@latest` 按需拉取
+tokscale，无需预装。
 
     pip install -e .[dev]
     ai-usage-reporter install
@@ -49,7 +52,7 @@ launchd，Linux 用 systemd 用户单元。
 |---|---|
 | 0 | 成功（包括 contributions 为空） |
 | 2 | 配置校验失败 |
-| 3 | tokscale 二进制缺失 / 不可执行 |
+| 3 | npx 缺失（未安装 Node.js）/ 不可执行 |
 | 4 | tokscale 非零退出 |
 | 5 | tokscale 输出不是合法 JSON |
 | 6 | insight 不可达（连接拒绝 / 超时） |
