@@ -1,4 +1,4 @@
-"""Platform timer installation: launchd (macOS) + systemd user (Linux)."""
+"""Platform timer installation: launchd (macOS) + systemd (Linux) + Task Scheduler (Windows)."""
 from __future__ import annotations
 
 import json
@@ -14,7 +14,8 @@ from .config import default_state_dir
 log = logging.getLogger("reporter.installer")
 
 LAUNCHD_LABEL = "ai.usage-reporter.agent"
-START_INTERVAL = 900  # 15 minutes
+START_INTERVAL = 300  # 5 minutes
+TASK_NAME = "AIUsageReporter"
 
 TEMPLATES = Path(__file__).parent / "templates"
 
@@ -35,6 +36,18 @@ def _state_log_path() -> Path:
     return default_state_dir() / "launchd.log"
 
 
+def _task_xml_path() -> Path:
+    return default_state_dir() / "ai-usage-reporter-task.xml"
+
+
+def _task_bat_path() -> Path:
+    return default_state_dir() / "run-reporter.bat"
+
+
+def _task_vbs_path() -> Path:
+    return default_state_dir() / "run-reporter.vbs"
+
+
 def _render_plist(reporter_cmd: list[str]) -> str:
     args_xml = "\n".join(f"        <string>{a}</string>" for a in reporter_cmd)
     log_path = _state_log_path()
@@ -47,6 +60,33 @@ def _render_plist(reporter_cmd: list[str]) -> str:
 def _render_service(reporter_cmd: list[str]) -> str:
     text = (TEMPLATES / "systemd.service").read_text()
     text = text.replace("REPORTER_CMD", " ".join(reporter_cmd))
+    return text
+
+
+def _render_task_bat(reporter_cmd: list[str], log_path: Path, state_dir: Path) -> str:
+    """Wrapper .bat that sets TZ, invokes the reporter, and redirects output to a log."""
+    cmd_line = " ".join(reporter_cmd)
+    return (
+        "@echo off\r\n"
+        "set TZ=Asia/Shanghai\r\n"
+        f"{cmd_line} >> \"{log_path}\" 2>&1\r\n"
+    )
+
+
+def _render_task_vbs(bat_path: Path) -> str:
+    """VBScript launcher – runs the .bat with a hidden window."""
+    return (
+        'Set objShell = CreateObject("WScript.Shell")\r\n'
+        f'objShell.Run """{bat_path}""", 0, True\r\n'
+    )
+
+
+def _render_task_xml(reporter_cmd: list[str]) -> str:
+    # Task Scheduler calls the .vbs wrapper (hidden window), which calls the .bat.
+    vbs = _task_vbs_path()
+    text = (TEMPLATES / "scheduled-task.xml").read_text(encoding="utf-8")
+    text = text.replace("REPORTER_COMMAND", "wscript.exe")
+    text = text.replace("REPORTER_ARGUMENTS", f'"{vbs}"')
     return text
 
 
@@ -100,8 +140,26 @@ def install(config_path: Path, *,
         result["hints"].append("systemctl --user enable --now ai-usage-reporter.timer")
         result["hints"].append("loginctl enable-linger $USER  (if you want it to run while logged out)")
         log.info("wrote systemd units: %s", units)
+    elif plat == "windows":
+        state = default_state_dir()
+        state.mkdir(parents=True, exist_ok=True)
+        log_path = state / "run.log"
+        bat_path = _task_bat_path()
+        bat_path.write_text(_render_task_bat(reporter_cmd, log_path, state), encoding="utf-8")
+        vbs_path = _task_vbs_path()
+        vbs_path.write_text(_render_task_vbs(bat_path), encoding="utf-8")
+        xml_path = _task_xml_path()
+        xml_path.write_text(_render_task_xml(reporter_cmd), encoding="utf-16")
+        result["task_bat_path"] = str(bat_path)
+        result["task_vbs_path"] = str(vbs_path)
+        result["task_xml_path"] = str(xml_path)
+        result["hints"].append(
+            f'schtasks.exe /Create /TN "{TASK_NAME}" /XML "{xml_path}" /F'
+        )
+        result["hints"].append(f'schtasks.exe /Run /TN "{TASK_NAME}"')
+        log.info("wrote task scheduler XML: %s", xml_path)
     else:
-        raise InstallerError(f"only macOS and Linux are supported (got {plat})")
+        raise InstallerError(f"unsupported platform: {plat}")
 
     return result
 
@@ -123,5 +181,12 @@ def uninstall(*, platform_name: str | None = None) -> None:
             except FileNotFoundError:
                 pass
         log.info("removed systemd units: %s", units)
+    elif plat == "windows":
+        for p in (_task_xml_path(), _task_bat_path(), _task_vbs_path()):
+            try:
+                p.unlink()
+            except FileNotFoundError:
+                pass
+        log.info("removed task scheduler files: XML + bat + vbs")
     else:
-        raise InstallerError(f"only macOS and Linux are supported (got {plat})")
+        raise InstallerError(f"unsupported platform: {plat}")

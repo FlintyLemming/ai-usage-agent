@@ -64,6 +64,14 @@ def test_collect_sets_tz_shanghai_in_env(tmp_path, monkeypatch):
     assert env.get("TZ") == "Asia/Shanghai"
 
 
+def test_collect_makes_npx_noninteractive(tmp_path, monkeypatch):
+    _put_npx_on_path(tmp_path, monkeypatch)
+    run, calls = fake_runner(b'{"contributions":[]}')
+    collect(make_cfg(), runner=run)
+    env = calls[0][1]
+    assert env.get("npm_config_yes") == "true"
+
+
 def test_collect_parses_json(tmp_path, monkeypatch, tokscale_sample):
     _put_npx_on_path(tmp_path, monkeypatch)
     run, _ = fake_runner(json.dumps(tokscale_sample).encode())
@@ -82,7 +90,7 @@ def test_binary_missing_exits_3(monkeypatch):
 def test_binary_not_executable_exits_3(tmp_path, monkeypatch):
     fake = tmp_path / "npx"
     fake.write_text("#!/bin/sh\nexit 0\n")
-    fake.chmod(0o644)  # not executable
+    monkeypatch.setattr("os.access", lambda path, mode: False)
     monkeypatch.setattr("shutil.which", lambda name: str(fake) if name == "npx" else None)
     with pytest.raises(CollectorError) as exc:
         collect(make_cfg(tokscale_bin=str(fake)))
@@ -96,6 +104,18 @@ def test_tokscale_nonzero_exits_4(tmp_path, monkeypatch):
         collect(make_cfg(), runner=run)
     assert exc.value.exit_code == 4
     assert "boom" in str(exc.value)
+
+
+def test_tokscale_timeout_exits_4(tmp_path, monkeypatch):
+    _put_npx_on_path(tmp_path, monkeypatch)
+
+    def run(argv, env):
+        raise subprocess.TimeoutExpired(argv, 240)
+
+    with pytest.raises(CollectorError) as exc:
+        collect(make_cfg(), runner=run)
+    assert exc.value.exit_code == 4
+    assert "timed out after 240 seconds" in str(exc.value)
 
 
 def test_bad_json_exits_5(tmp_path, monkeypatch):

@@ -86,6 +86,10 @@ def cmd_install(args) -> int:
     if "service_path" in result:
         print(f"systemd service: {result['service_path']}")
         print(f"systemd timer: {result['timer_path']}")
+    if "task_xml_path" in result:
+        print(f"task scheduler XML: {result['task_xml_path']}")
+        print(f"wrapper bat: {result['task_bat_path']}")
+        print(f"wrapper vbs: {result['task_vbs_path']}")
     for hint in result.get("hints", []):
         print(f"hint: {hint}")
     print("Edit the config to confirm source_id, then activate.")

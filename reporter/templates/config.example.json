@@ -1,7 +1,7 @@
 {
-  "source_id": "<hostname>",
+  "source_id": "inc-win-en",
   "source_label": null,
-  "insight_url": "http://127.0.0.1:8765",
+  "insight_url": "https://sub-usage.mitsea.com/",
   "tokscale_bin": "npx",
   "tokscale_args": ["tokscale@latest", "graph"],
   "lookback_days": 90,

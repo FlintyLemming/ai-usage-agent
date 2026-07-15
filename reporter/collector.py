@@ -15,6 +15,7 @@ from .config import Config
 log = logging.getLogger("reporter.collector")
 
 UTC8 = timezone(timedelta(hours=8))
+TOKSCALE_TIMEOUT_SECONDS = 240
 
 
 class CollectorError(Exception):
@@ -54,7 +55,13 @@ def _resolve_binary(name_or_path: str) -> str:
 
 
 def _default_runner(argv: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
-    return subprocess.run(argv, capture_output=True, env=env)
+    return subprocess.run(
+        argv,
+        capture_output=True,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        timeout=TOKSCALE_TIMEOUT_SECONDS,
+    )
 
 
 def collect(config: Config, *, runner: Callable | None = None) -> dict:
@@ -63,9 +70,18 @@ def collect(config: Config, *, runner: Callable | None = None) -> dict:
     argv = [bin_path, *config.tokscale_args, "--since", since_date(config.lookback_days)]
     env = dict(os.environ)
     env["TZ"] = "Asia/Shanghai"
+    if Path(bin_path).stem.lower() == "npx":
+        # Scheduled runs have no interactive console for npx install prompts.
+        env["npm_config_yes"] = "true"
     log.info("running tokscale: %s", argv)
     run = runner or _default_runner
-    proc = run(argv, env)
+    try:
+        proc = run(argv, env)
+    except subprocess.TimeoutExpired as e:
+        raise CollectorError(
+            f"tokscale timed out after {TOKSCALE_TIMEOUT_SECONDS} seconds",
+            4,
+        ) from e
     if proc.returncode != 0:
         stderr = proc.stderr.decode(errors="replace") if proc.stderr else ""
         raise CollectorError(f"tokscale exited {proc.returncode}: {stderr.strip()}", 4)
