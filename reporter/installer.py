@@ -64,11 +64,10 @@ def _render_service(reporter_cmd: list[str]) -> str:
 
 
 def _render_task_bat(reporter_cmd: list[str], log_path: Path, state_dir: Path) -> str:
-    """Wrapper .bat that sets TZ, invokes the reporter, and redirects output to a log."""
+    """Wrapper .bat that invokes the reporter and redirects output to a log."""
     cmd_line = " ".join(reporter_cmd)
     return (
         "@echo off\r\n"
-        "set TZ=Asia/Shanghai\r\n"
         f"{cmd_line} >> \"{log_path}\" 2>&1\r\n"
     )
 

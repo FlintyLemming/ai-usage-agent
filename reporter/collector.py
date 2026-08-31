@@ -6,7 +6,7 @@ import logging
 import os
 import shutil
 import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable
 
@@ -14,7 +14,6 @@ from .config import Config
 
 log = logging.getLogger("reporter.collector")
 
-UTC8 = timezone(timedelta(hours=8))
 TOKSCALE_TIMEOUT_SECONDS = 240
 
 
@@ -26,10 +25,15 @@ class CollectorError(Exception):
         self.exit_code = exit_code
 
 
-def since_date(lookback_days: int, *, now_utc8: datetime | None = None) -> str:
-    """Return 'YYYY-MM-DD' = today(UTC+8) - lookback_days."""
-    now = now_utc8 or datetime.now(UTC8)
-    return (now - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+def since_date(lookback_days: int, *, now: datetime | None = None) -> str:
+    """Return 'YYYY-MM-DD' = today (machine local time) - lookback_days.
+
+    tokscale ignores TZ and buckets usage by the machine's own local day, so
+    the window we ask for is anchored to that same day. Anchoring it to a
+    fixed zone instead would desync our dates from the buckets it returns.
+    """
+    n = now or datetime.now().astimezone()
+    return (n - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
 
 def _resolve_binary(name_or_path: str) -> str:
@@ -69,7 +73,6 @@ def collect(config: Config, *, runner: Callable | None = None) -> dict:
     bin_path = _resolve_binary(config.tokscale_bin)
     argv = [bin_path, *config.tokscale_args, "--since", since_date(config.lookback_days)]
     env = dict(os.environ)
-    env["TZ"] = "Asia/Shanghai"
     if Path(bin_path).stem.lower() == "npx":
         # Scheduled runs have no interactive console for npx install prompts.
         env["npm_config_yes"] = "true"

@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 
 from .collector import CollectorError, collect
@@ -16,7 +16,16 @@ from .uploader import UploaderError, upload
 
 log = logging.getLogger("reporter")
 
-UTC8 = timezone(timedelta(hours=8))
+
+def _local_today(now: datetime | None = None) -> str:
+    """Today's date in the machine's local timezone.
+
+    This is the day boundary tokscale buckets usage into (it ignores TZ), so
+    it is also the only correct value for `reported_at`: insight freezes every
+    day before it, and a watermark running ahead of the local day would freeze
+    the current day while tokscale is still adding to it.
+    """
+    return (now or datetime.now().astimezone()).strftime("%Y-%m-%d")
 
 
 def _state_dir_for(cfg_path: Path | None) -> Path:
@@ -26,7 +35,7 @@ def _state_dir_for(cfg_path: Path | None) -> Path:
 
 
 def _now_iso() -> str:
-    return datetime.now(UTC8).isoformat(timespec="seconds")
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def cmd_run(args) -> int:
@@ -53,7 +62,7 @@ def cmd_run(args) -> int:
 
     points = map_points(raw)
 
-    reported_at = datetime.now(UTC8).strftime("%Y-%m-%d")
+    reported_at = _local_today()
     try:
         sent = upload(cfg, points, reported_at, state_dir)
     except UploaderError as e:

@@ -56,12 +56,22 @@ def test_collect_invokes_tokscale_with_since(tmp_path, monkeypatch, tokscale_sam
     assert "graph" in argv
 
 
-def test_collect_sets_tz_shanghai_in_env(tmp_path, monkeypatch):
+def test_collect_does_not_override_tz(tmp_path, monkeypatch):
+    # tokscale ignores TZ and buckets by the machine's local day, so forcing a
+    # TZ here would only desync our dates from the buckets it actually emits.
     _put_npx_on_path(tmp_path, monkeypatch)
+    monkeypatch.setenv("TZ", "America/Los_Angeles")
     run, calls = fake_runner(b'{"contributions":[]}')
     collect(make_cfg(), runner=run)
-    env = calls[0][1]
-    assert env.get("TZ") == "Asia/Shanghai"
+    assert calls[0][1].get("TZ") == "America/Los_Angeles"
+
+
+def test_collect_leaves_tz_unset_when_ambient_has_none(tmp_path, monkeypatch):
+    _put_npx_on_path(tmp_path, monkeypatch)
+    monkeypatch.delenv("TZ", raising=False)
+    run, calls = fake_runner(b'{"contributions":[]}')
+    collect(make_cfg(), runner=run)
+    assert "TZ" not in calls[0][1]
 
 
 def test_collect_makes_npx_noninteractive(tmp_path, monkeypatch):
@@ -129,10 +139,19 @@ def test_bad_json_exits_5(tmp_path, monkeypatch):
 def test_since_date_default():
     # 2026-07-02 minus 90 days = 2026-04-03
     now = datetime(2026, 7, 2, 15, 0, tzinfo=UTC8)
-    assert since_date(90, now_utc8=now) == "2026-04-03"
+    assert since_date(90, now=now) == "2026-04-03"
 
 
 def test_since_date_zero_lookback():
     now = datetime(2026, 7, 2, 0, 30, tzinfo=UTC8)
-    # midnight UTC+8 boundary -> 2026-07-02
-    assert since_date(0, now_utc8=now) == "2026-07-02"
+    assert since_date(0, now=now) == "2026-07-02"
+
+
+def test_since_date_uses_machine_local_day_not_utc8():
+    # A machine at UTC-7 at 20:12 local: it is already 2026-08-31 in UTC+8,
+    # but tokscale's newest bucket is the local day 2026-08-30. The window we
+    # ask for must be anchored to that local day.
+    pdt = timezone(timedelta(hours=-7))
+    now = datetime(2026, 8, 30, 20, 12, tzinfo=pdt)
+    assert since_date(0, now=now) == "2026-08-30"
+    assert since_date(90, now=now) == "2026-06-01"

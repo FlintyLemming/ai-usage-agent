@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -146,3 +147,32 @@ def test_install_invokes_installer(tmp_path, monkeypatch, capsys):
     code = cli(["install"])
     assert code == 0
     assert "do the thing" in capsys.readouterr().out
+
+
+def test_local_today_uses_machine_local_day_not_utc8():
+    from reporter.__main__ import _local_today
+
+    # UTC-7 at 20:12 -> already 2026-08-31 in UTC+8, but the local day, which is
+    # the day tokscale buckets into, is still 2026-08-30.
+    pdt = timezone(timedelta(hours=-7))
+    assert _local_today(datetime(2026, 8, 30, 20, 12, tzinfo=pdt)) == "2026-08-30"
+
+
+def test_run_sends_local_day_as_reported_at(tmp_path, monkeypatch):
+    cfg = write_cfg(tmp_path)
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setattr("reporter.__main__.collect", lambda c: {"contributions": []})
+    monkeypatch.setattr("reporter.__main__._local_today", lambda now=None: "2026-08-30")
+
+    seen = {}
+
+    def fake_upload(c, pts, ra, sd, **k):
+        seen["reported_at"] = ra
+        return len(pts)
+
+    monkeypatch.setattr("reporter.__main__.upload", fake_upload)
+
+    assert cli(["run", "--config", str(cfg)]) == 0
+    # The freeze watermark must never run ahead of the day the points are
+    # bucketed in, or the current day is frozen while it is still growing.
+    assert seen["reported_at"] == "2026-08-30"

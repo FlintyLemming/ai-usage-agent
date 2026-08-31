@@ -10,11 +10,6 @@
     </array>
     <key>StartInterval</key>
     <integer>300</integer>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>TZ</key>
-        <string>Asia/Shanghai</string>
-    </dict>
     <key>StandardOutPath</key>
     <string>STATE_LOG_PATH</string>
     <key>StandardErrorPath</key>

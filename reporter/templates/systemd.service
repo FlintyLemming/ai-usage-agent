@@ -3,7 +3,6 @@ Description=ai-usage-reporter one-shot collection cycle
 
 [Service]
 Type=oneshot
-Environment=TZ=Asia/Shanghai
 ExecStart=REPORTER_CMD
 
 [Install]

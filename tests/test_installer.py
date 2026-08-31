@@ -25,7 +25,7 @@ def test_install_macos_writes_plist_and_config(tmp_path, monkeypatch):
     text = plist.read_text()
     assert "ai.usage-reporter.agent" in text
     assert "<integer>300</integer>" in text
-    assert "Asia/Shanghai" in text
+    assert "Asia/Shanghai" not in text  # no TZ override: tokscale buckets by local day
     assert "/usr/local/bin/ai-usage-reporter" in text
     assert "run" in text and "--config" in text and str(cfg_path) in text
 
@@ -51,6 +51,7 @@ def test_install_linux_writes_systemd_units(tmp_path, monkeypatch):
     tmr = (units / "ai-usage-reporter.timer").read_text()
     assert "Type=oneshot" in svc
     assert "ExecStart=/usr/bin/ai-usage-reporter run --config" in svc
+    assert "TZ=" not in svc  # no TZ override: tokscale buckets by local day
     assert "OnCalendar=*:0/5" in tmr
     assert "Persistent=true" in tmr
 
@@ -85,7 +86,7 @@ def test_install_windows_writes_scheduled_task(tmp_path, monkeypatch):
     assert xml_path.exists()
 
     bat_text = bat_path.read_text(encoding="utf-8")
-    assert "TZ=Asia/Shanghai" in bat_text
+    assert "TZ=" not in bat_text  # no TZ override: tokscale buckets by local day
     assert "C:\\Python312\\python.exe" in bat_text
     assert "run.log" in bat_text
     assert ">>" in bat_text and "2>&1" in bat_text
