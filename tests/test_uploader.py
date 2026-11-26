@@ -52,13 +52,13 @@ def test_post_payload_sends_auth_header_when_set():
     run, received = fake_poster()
     c = cfg(auth_token="sekret")
     post_payload(c, fresh(), poster=run)
-    assert received[0][2].get("X-Report-Key") == "sekret"
+    assert received[0][2].get("Authorization") == "Bearer sekret"
 
 
 def test_post_payload_no_auth_header_when_unset():
     run, received = fake_poster()
     post_payload(cfg(), fresh(), poster=run)
-    assert "X-Report-Key" not in received[0][2]
+    assert "Authorization" not in received[0][2]
 
 
 def test_non_2xx_exits_7():

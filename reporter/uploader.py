@@ -51,7 +51,7 @@ def post_payload(config: Config, payload: dict, *, poster: Callable) -> None:
     body = json.dumps(payload).encode()
     headers = {"Content-Type": "application/json"}
     if config.auth_token:
-        headers["X-Report-Key"] = config.auth_token
+        headers["Authorization"] = f"Bearer {config.auth_token}"
     try:
         status, _ = poster(config.report_url(), body, headers, config.request_timeout_seconds)
     except (urllib.error.URLError, socket.timeout) as e:

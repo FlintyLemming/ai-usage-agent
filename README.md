@@ -18,7 +18,7 @@ launchd，Linux 用 systemd 用户单元。
    client 的记录按每类 token 求和合并。这样面板的总 token 与 tokscale 的
    `totalTokens` 完全一致（五类互斥相加）。
 3. 将 `{"source_id","source_label","reported_at","points"}` POST 到
-   `{insight_url}/api/usage/report`（配置了 `auth_token` 时附带 `X-Report-Key`）。
+   `{insight_url}/api/usage/report`（配置了 `auth_token` 时附带 `Authorization: Bearer <auth_token>`）。
    ai-plan-insight 对 payload 覆盖到的每个未封板日期做整天替换（先删后插），
    重复运行不会重复计数；一旦服务端收到 `reported_at` 晚于 D 的上报，该
    source 的 D 日即封板，之后本地历史数据被清理或重写也不会再影响面板
